@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import json
-import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
-import tempfile
 from typing import Callable, Sequence
 
 from .config import PROFILE_PATH_ENV
@@ -58,7 +55,7 @@ def install_mcp_clients(
             elif client == "claude":
                 results.append(_install_claude(profile, python, force, which, run))
             elif client == "opencode":
-                results.append(_install_opencode(profile, python, force, which, home or Path.home()))
+                results.append(_install_opencode(profile, python, which, run))
             else:
                 raise InstallError(f"Unsupported MCP client: {client}")
         except InstallError as error:
@@ -102,9 +99,9 @@ def _install_claude(profile: Path, python: str, force: bool, which: Which, run: 
         "user",
         "--transport",
         "stdio",
+        SERVER_NAME,
         "--env",
         f"{PROFILE_PATH_ENV}={profile}",
-        SERVER_NAME,
         "--",
         python,
         "-m",
@@ -117,50 +114,30 @@ def _install_claude(profile: Path, python: str, force: bool, which: Which, run: 
 def _install_opencode(
     profile: Path,
     python: str,
-    force: bool,
     which: Which,
-    home: Path,
+    run: Runner,
 ) -> InstallResult:
-    is_v2 = bool(which("opencode2"))
-    if not is_v2 and not which("opencode"):
+    executable = which("opencode2") or which("opencode")
+    if not executable:
         raise InstallError("OpenCode was not found on PATH.")
-
-    config_dir = home / ".config" / "opencode"
-    config_path = config_dir / "opencode.json"
-    jsonc_path = config_dir / "opencode.jsonc"
-    if jsonc_path.is_file() and not config_path.is_file():
-        raise InstallError(
-            "A JSONC-only OpenCode config already exists. Add PostureBase manually or rename it to opencode.json."
-        )
-    data = _read_json_object(config_path)
-    data.setdefault("$schema", "https://opencode.ai/config.json")
-    mcp = data.setdefault("mcp", {})
-    if not isinstance(mcp, dict):
-        raise InstallError("OpenCode's `mcp` setting is not a JSON object.")
-
-    if is_v2:
-        servers = mcp.setdefault("servers", {})
-        if not isinstance(servers, dict):
-            raise InstallError("OpenCode V2's `mcp.servers` setting is not a JSON object.")
-    else:
-        servers = mcp
-
-    if SERVER_NAME in servers and not force:
-        return InstallResult("opencode", "Already installed. Use --force to update it.")
-
-    entry: dict[str, object] = {
-        "type": "local",
-        "command": [python, "-m", SERVER_MODULE],
-        "environment": {PROFILE_PATH_ENV: str(profile)},
-    }
-    if is_v2:
-        entry["cwd"] = str(profile.parent)
-    else:
-        entry["enabled"] = True
-    servers[SERVER_NAME] = entry
-    _write_json_atomic(config_path, data)
-    command_name = "opencode2" if is_v2 else "opencode"
-    return InstallResult("opencode", f"Installed. Restart OpenCode, then run `{command_name} mcp list`.")
+    command = [
+        executable,
+        "mcp",
+        "add",
+        SERVER_NAME,
+        "--env",
+        f"{PROFILE_PATH_ENV}={profile}",
+        "--",
+        python,
+        "-m",
+        SERVER_MODULE,
+    ]
+    _run_required(run, command)
+    command_name = Path(executable).stem
+    return InstallResult(
+        "opencode",
+        f"Installed or updated. Restart OpenCode, then run `{command_name} mcp list`.",
+    )
 
 
 def _run_command(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
@@ -189,37 +166,3 @@ def _run_optional(run: Runner, command: Sequence[str]) -> None:
         run(command)
     except (OSError, subprocess.SubprocessError):
         pass
-
-
-def _read_json_object(path: Path) -> dict[str, object]:
-    if not path.is_file():
-        return {}
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise InstallError(f"Could not safely read OpenCode config: {redact_text(error)}") from error
-    if not isinstance(value, dict):
-        raise InstallError("OpenCode config must contain a JSON object.")
-    return value
-
-
-def _write_json_atomic(path: Path, data: dict[str, object]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_name: str | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            newline="\n",
-            dir=path.parent,
-            prefix=".opencode.",
-            suffix=".tmp",
-            delete=False,
-        ) as temporary:
-            json.dump(data, temporary, indent=2, ensure_ascii=False)
-            temporary.write("\n")
-            temporary_name = temporary.name
-        os.replace(temporary_name, path)
-    finally:
-        if temporary_name and Path(temporary_name).exists():
-            Path(temporary_name).unlink()

@@ -178,7 +178,7 @@ After installation, restart OpenCode and run:
 opencode mcp list
 ```
 
-PostureBase safely merges its entry into `~/.config/opencode/opencode.json`. Existing unrelated OpenCode settings are preserved. Both the current OpenCode format and OpenCode V2's `mcp.servers` format are supported when the matching executable is installed.
+PostureBase uses OpenCode's own `mcp add` command to update the global configuration. OpenCode safely preserves existing settings and comments in either `opencode.json` or `opencode.jsonc`. The matching `opencode` or `opencode2` executable is detected automatically.
 
 ## 5. Ask the agent to scan
 
