@@ -6,6 +6,31 @@ PostureBase is a deterministic, local, read-only security scanner for Supabase p
 
 PostureBase can run directly in a terminal or as a local MCP server for Codex, Claude Code, and OpenCode.
 
+## Fast installation
+
+Install the stable `v0.1.0` release directly from GitHub:
+
+```powershell
+uv tool install "git+https://github.com/ferasbusiness666/posturebase.git@v0.1.0"
+```
+
+Open your Supabase project's local source folder, then configure and scan it:
+
+```powershell
+cd "C:\path\to\your\supabase-project"
+posturebase setup
+posturebase scan --format text
+```
+
+When installed this way, use `posturebase ...` instead of `uv run posturebase ...` for every command. No hosted PostureBase service is created.
+
+Upgrade or uninstall the released tool later with:
+
+```powershell
+uv tool upgrade supabase-security-scanner
+uv tool uninstall supabase-security-scanner
+```
+
 ## Give this prompt to your coding agent
 
 Copy the entire prompt below into Codex, Claude Code, or OpenCode. The agent can prepare the installation and configure its own MCP entry. You will enter the Supabase credentials yourself in a private terminal so they never need to be pasted into chat.
@@ -52,17 +77,18 @@ Every finding includes a stable rule ID, severity, affected resource, evidence, 
 
 You need:
 
-1. Python 3.11 or newer.
-2. [uv](https://docs.astral.sh/uv/) for the Python environment.
-3. A Supabase project that you own or are authorized to scan.
-4. These three Supabase values:
+1. Git.
+2. Python 3.11 or newer.
+3. [uv](https://docs.astral.sh/uv/) for the Python environment.
+4. A Supabase project that you own or are authorized to scan.
+5. These three Supabase values:
    - Project reference: the identifier shown in the project URL and dashboard.
    - Session Pooler database URL: open the Supabase dashboard, select **Connect**, choose **Session Pooler**, and copy the URI.
    - Personal access token: create one in your Supabase account access-token settings. This is a Management API token, not an anon key, publishable key, service-role key, or secret API key.
 
 Use a test project while learning PostureBase. If the database password contains characters such as `@`, `#`, `/`, or `:`, use the correctly URL-encoded password in the database URI.
 
-## 1. Install PostureBase
+## 1. Install PostureBase from source
 
 ```powershell
 git clone https://github.com/ferasbusiness666/posturebase.git

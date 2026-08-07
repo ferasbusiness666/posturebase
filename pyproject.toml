@@ -17,6 +17,11 @@ dependencies = [
   "python-dotenv>=1.0,<2",
 ]
 
+[project.urls]
+Homepage = "https://github.com/ferasbusiness666/posturebase"
+Repository = "https://github.com/ferasbusiness666/posturebase"
+Issues = "https://github.com/ferasbusiness666/posturebase/issues"
+
 [project.optional-dependencies]
 dev = ["pytest>=8.3,<9"]
 
