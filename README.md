@@ -1,5 +1,7 @@
 # PostureBase
 
+[![CI](https://github.com/ferasbusiness666/posturebase/actions/workflows/ci.yml/badge.svg)](https://github.com/ferasbusiness666/posturebase/actions/workflows/ci.yml)
+
 PostureBase is a deterministic, local, read-only security scanner for Supabase projects. It checks database metadata, RLS policies, Storage, Auth configuration, rate-limit settings, and local source files. It does not use AI to decide what is secure, it does not host a backend, and it never changes your Supabase project.
 
 PostureBase can run directly in a terminal or as a local MCP server for Codex, Claude Code, and OpenCode.
