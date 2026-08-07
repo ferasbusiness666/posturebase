@@ -8,6 +8,12 @@ from dotenv import load_dotenv
 
 
 DEFAULT_PUBLIC_BUCKET_ALLOWLIST = frozenset({"avatars", "public-assets", "public_assets"})
+PROFILE_PATH_ENV = "POSTUREBASE_CONFIG_PATH"
+DEFAULT_PROFILE_NAME = ".env.posturebase"
+
+
+def default_profile_path(base_dir: Path | None = None) -> Path:
+    return (base_dir or Path.cwd()) / DEFAULT_PROFILE_NAME
 
 
 @dataclass(frozen=True)
@@ -23,10 +29,19 @@ class ScanConfig:
     max_auth_rate_limits: dict[str, int] = field(default_factory=dict)
 
     @classmethod
-    def from_environment(cls) -> "ScanConfig":
-        # Only load the current project's ignored .env; never search parent directories
-        # or overwrite values intentionally supplied by a host process.
-        load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
+    def from_environment(cls, profile_path: Path | None = None) -> "ScanConfig":
+        # Process environment values always win. A dedicated PostureBase profile is
+        # preferred, while the current project's .env remains a backwards-compatible
+        # fallback. Parent directories are never searched.
+        explicit_profile = profile_path
+        if explicit_profile is None:
+            configured_path = os.environ.get(PROFILE_PATH_ENV)
+            explicit_profile = Path(configured_path).expanduser() if configured_path else None
+        profile = explicit_profile or default_profile_path()
+        if profile.is_file():
+            load_dotenv(dotenv_path=profile, override=False)
+        if explicit_profile is None:
+            load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
         source_value = os.environ.get("SUPABASE_SCANNER_SOURCE_DIR")
         allowlist_value = os.environ.get("SUPABASE_SCANNER_PUBLIC_BUCKET_ALLOWLIST")
         allowlist = (

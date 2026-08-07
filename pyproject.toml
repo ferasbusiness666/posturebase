@@ -21,6 +21,8 @@ dependencies = [
 dev = ["pytest>=8.3,<9"]
 
 [project.scripts]
+posturebase = "supabase_security_scanner.cli:main"
+posturebase-mcp = "supabase_security_scanner.mcp_server:main"
 supa-sec = "supabase_security_scanner.cli:main"
 supa-sec-mcp = "supabase_security_scanner.mcp_server:main"
 

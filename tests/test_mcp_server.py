@@ -6,21 +6,23 @@ from pathlib import Path
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
+from supabase_security_scanner.config import PROFILE_PATH_ENV
+
 
 def test_mcp_server_returns_a_source_only_scan(tmp_path: Path) -> None:
     (tmp_path / "client.ts").write_text("export const ready = true;\n", encoding="utf-8")
+    profile = tmp_path / ".env.posturebase"
+    profile.write_text(
+        f"SUPABASE_SCANNER_SOURCE_DIR={json.dumps(str(tmp_path))}\n",
+        encoding="utf-8",
+    )
 
     async def call_server() -> dict:
         server = StdioServerParameters(
             command=sys.executable,
             args=["-m", "supabase_security_scanner.mcp_server"],
             cwd=Path.cwd(),
-            env={
-                "SUPABASE_PROJECT_REF": "",
-                "SUPABASE_DATABASE_URL": "",
-                "SUPABASE_ACCESS_TOKEN": "",
-                "SUPABASE_SCANNER_SOURCE_DIR": str(tmp_path),
-            },
+            env={PROFILE_PATH_ENV: str(profile)},
         )
         async with stdio_client(server) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:

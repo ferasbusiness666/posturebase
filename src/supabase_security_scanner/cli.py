@@ -6,8 +6,10 @@ from pathlib import Path
 import sys
 from typing import Sequence
 
-from .config import ScanConfig
+from .config import ScanConfig, default_profile_path
+from .mcp_install import InstallError, install_mcp_clients
 from .models import Severity
+from .onboarding import SetupError, run_setup
 from .scanner import SecurityScanner
 
 
@@ -22,11 +24,22 @@ _SEVERITY_EXIT_ORDER = {
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="supa-sec",
+        prog="posturebase",
         description="Run deterministic, read-only Supabase security checks locally.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    setup = subparsers.add_parser("setup", help="Create a secure local PostureBase profile.")
+    setup.add_argument("--config", type=Path, help="Use a custom local profile path.")
+    setup.add_argument("--no-verify", action="store_true", help="Save without testing the connections.")
+    setup.add_argument(
+        "--hide-input",
+        action="store_true",
+        help="Hide database URL and access-token input for screen sharing.",
+    )
+
     scan = subparsers.add_parser("scan", help="Scan a Supabase project and optional local source directory.")
+    scan.add_argument("--config", type=Path, help="Use a custom PostureBase profile.")
     scan.add_argument("--project-ref", help="Overrides SUPABASE_PROJECT_REF. Never pass credentials as CLI flags.")
     scan.add_argument("--source-dir", type=Path, help="Overrides SUPABASE_SCANNER_SOURCE_DIR.")
     scan.add_argument("--output", type=Path, help="Write JSON findings to this local file.")
@@ -49,15 +62,34 @@ def build_parser() -> argparse.ArgumentParser:
         choices=tuple(_SEVERITY_EXIT_ORDER),
         help="Exit non-zero when a finding meets or exceeds this severity.",
     )
+
+    mcp = subparsers.add_parser("mcp", help="Connect the local scanner to an AI coding agent.")
+    mcp_subparsers = mcp.add_subparsers(dest="mcp_command", required=True)
+    install = mcp_subparsers.add_parser("install", help="Install the local PostureBase MCP server.")
+    install.add_argument("client", choices=("codex", "claude", "opencode", "all"))
+    install.add_argument("--config", type=Path, help="Use a custom PostureBase profile.")
+    install.add_argument("--force", action="store_true", help="Replace an existing PostureBase entry.")
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "setup":
+        try:
+            return run_setup(
+                profile_path=args.config,
+                verify=not args.no_verify,
+                hide_input=args.hide_input,
+            )
+        except SetupError as error:
+            print(f"ERROR {error}", file=sys.stderr)
+            return 2
+    if args.command == "mcp":
+        return _install_mcp(args)
     if args.command != "scan":
         return 2
     rate_limits = _parse_rate_limits(args.max_rate_limit)
-    base_config = ScanConfig.from_environment()
+    base_config = ScanConfig.from_environment(profile_path=args.config)
     allowlist = (
         base_config.public_bucket_allowlist.union(args.allow_public_bucket)
         if args.allow_public_bucket
@@ -78,6 +110,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         _print_text(payload)
     return _exit_code(payload, args.fail_on)
+
+
+def _install_mcp(args: argparse.Namespace) -> int:
+    profile = (args.config or default_profile_path()).expanduser()
+    try:
+        results, errors = install_mcp_clients(
+            [args.client],
+            profile_path=profile,
+            force=args.force,
+        )
+    except InstallError as error:
+        print(f"ERROR {error}", file=sys.stderr)
+        return 2
+    for result in results:
+        print(f"OK  {result.client}: {result.detail}")
+    for error in errors:
+        print(f"ERROR {error}", file=sys.stderr)
+    return int(bool(errors))
 
 
 def _parse_rate_limits(values: list[str]) -> dict[str, int]:
