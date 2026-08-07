@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "supabase-security-scanner"
+version = "0.1.0"
+description = "A deterministic, local, read-only Supabase security preflight scanner."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "NGN Hacks 2026" }]
+dependencies = [
+  "httpx>=0.27,<1",
+  "mcp>=1.27,<2",
+  "psycopg[binary]>=3.2,<4",
+  "python-dotenv>=1.0,<2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3,<9"]
+
+[project.scripts]
+supa-sec = "supabase_security_scanner.cli:main"
+supa-sec-mcp = "supabase_security_scanner.mcp_server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/supabase_security_scanner"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
