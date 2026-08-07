@@ -23,3 +23,16 @@ def test_source_scanner_ignores_untracked_local_env_secret(tmp_path: Path) -> No
     (tmp_path / ".env").write_text(f"SUPABASE_SECRET_KEY={secret_value}\n", encoding="utf-8")
 
     assert SourceScanner().scan(tmp_path) == []
+
+
+def test_candidate_files_includes_env_files_without_descending_into_excluded_directories(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("SUPABASE_URL=https://example.supabase.co\n", encoding="utf-8")
+    excluded_file = tmp_path / ".venv" / "leaked.ts"
+    excluded_file.parent.mkdir()
+    excluded_file.write_text("const ignored = true;\n", encoding="utf-8")
+
+    candidates = SourceScanner._candidate_files(tmp_path)
+
+    assert env_file in candidates
+    assert excluded_file not in candidates

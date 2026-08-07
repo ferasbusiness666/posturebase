@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 import re
@@ -98,16 +99,20 @@ class SourceScanner:
     @staticmethod
     def _candidate_files(root: Path) -> list[Path]:
         candidates: list[Path] = []
-        for path in root.rglob("*"):
-            if any(part in _EXCLUDED_DIRECTORIES for part in path.parts):
-                continue
-            if not path.is_file() or path.suffix.lower() not in _SCANNED_SUFFIXES:
-                continue
-            try:
-                if path.stat().st_size <= _MAX_FILE_SIZE_BYTES:
-                    candidates.append(path)
-            except OSError:
-                continue
+        for current_root, directory_names, file_names in os.walk(root):
+            directory_names[:] = [
+                name for name in directory_names if name not in _EXCLUDED_DIRECTORIES
+            ]
+            directory = Path(current_root)
+            for file_name in file_names:
+                path = directory / file_name
+                if not path.name.startswith(".env") and path.suffix.lower() not in _SCANNED_SUFFIXES:
+                    continue
+                try:
+                    if path.is_file() and path.stat().st_size <= _MAX_FILE_SIZE_BYTES:
+                        candidates.append(path)
+                except OSError:
+                    continue
         return candidates
 
     @staticmethod
@@ -117,6 +122,7 @@ class SourceScanner:
                 ["git", "-C", str(root), "ls-files", "-z"],
                 check=False,
                 capture_output=True,
+                stdin=subprocess.DEVNULL,
                 timeout=5,
             )
         except (OSError, subprocess.SubprocessError):
